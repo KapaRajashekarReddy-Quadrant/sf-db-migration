@@ -37,6 +37,11 @@ const statusConfig = {
     label: "Ready",
     icon: Circle 
   },
+  Warning: {
+  color: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  label: "Warning",
+  icon: AlertTriangle,
+},
 };
 
 export function StatusBadge({ status }: { status: Status }) {

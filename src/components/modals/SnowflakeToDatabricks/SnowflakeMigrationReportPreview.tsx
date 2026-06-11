@@ -1,0 +1,580 @@
+// SnowflakeMigrationReportPreview.tsx
+
+import { useEffect, useRef, useState } from "react";
+import {
+  CheckCircle2, XCircle, AlertTriangle, RefreshCw,
+  Minus, Loader2, Download, X, FileText,
+  BookOpen, Code2, Cog, Clock, Database,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type SnowflakeMigrationItemType =
+  | "Notebook" | "SQLWorksheet" | "StoredProc" | "Task" | "Data";
+
+export type SnowflakeMigrationStatus =
+  | "Success" | "Running" | "Failed" | "Skipped" | "Replaced" | "Warning";
+
+export interface SnowflakeMigrationItem {
+  id: string;
+  name: string;
+  type: SnowflakeMigrationItemType;
+  status: SnowflakeMigrationStatus;
+  targetWorkspace?: string;
+  errorMessage?: string;
+  warningMessage?: string;
+  databricksNotebook?: string;
+  dataLevel?: "database" | "schema" | "table";
+}
+
+interface Props {
+  items: SnowflakeMigrationItem[];
+  allItems: SnowflakeMigrationItem[];
+  onClose: () => void;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const TYPE_LABELS: Record<SnowflakeMigrationItemType, string> = {
+  Notebook: "Notebook",
+  SQLWorksheet: "SQL Worksheet",
+  StoredProc: "Stored Proc",
+  Task: "Task",
+  Data: "Database",
+};
+
+const TYPE_ICONS: Record<SnowflakeMigrationItemType, React.ElementType> = {
+  Notebook: BookOpen,
+  SQLWorksheet: Code2,
+  StoredProc: Cog,
+  Task: Clock,
+  Data: Database,
+};
+
+const STATUS_META: Record<SnowflakeMigrationStatus, { label: string; color: string; dot: string }> = {
+  Success:  { label: "Created",  color: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" },
+  Running:  { label: "Running",  color: "text-blue-500",                          dot: "bg-blue-500" },
+  Failed:   { label: "Failed",   color: "text-destructive",                       dot: "bg-destructive" },
+  Warning:  { label: "Warning",  color: "text-yellow-500",                        dot: "bg-yellow-500" },
+  Replaced: { label: "Replaced", color: "text-blue-600",                          dot: "bg-blue-600" },
+  Skipped:  { label: "Skipped",  color: "text-muted-foreground",                  dot: "bg-muted-foreground" },
+};
+
+const fmt = (d: Date) =>
+  d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) +
+  " at " +
+  d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+// ─── PDF generation ───────────────────────────────────────────────────────────
+
+async function loadJsPDF(): Promise<any> {
+  if ((window as any).jspdf?.jsPDF) return (window as any).jspdf.jsPDF;
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load jsPDF"));
+    document.head.appendChild(s);
+  });
+  return (window as any).jspdf.jsPDF;
+}
+
+const hex = (h: string): [number, number, number] => {
+  const n = parseInt(h.replace("#", ""), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+const STATUS_COLORS: Record<SnowflakeMigrationStatus, string> = {
+  Success:  "#10b981",
+  Running:  "#3b82f6",
+  Failed:   "#ef4444",
+  Warning:  "#f59e0b",
+  Replaced: "#2563eb",
+  Skipped:  "#9ca3af",
+};
+
+async function generatePDF(items: SnowflakeMigrationItem[]) {
+  const JsPDF = await loadJsPDF();
+
+  const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const PW = doc.internal.pageSize.getWidth();
+  const PH = doc.internal.pageSize.getHeight();
+  const MARGIN = 36;
+  const now = new Date();
+
+  const NAVY   = hex("#0f172a");
+  const SLATE  = hex("#334155");
+  const MUTED  = hex("#64748b");
+  const BORDER = hex("#e2e8f0");
+  const WHITE  = hex("#ffffff");
+
+  const stats = {
+    total:    items.length,
+    success:  items.filter(i => i.status === "Success").length,
+    running:  items.filter(i => i.status === "Running").length,
+    failed:   items.filter(i => i.status === "Failed").length,
+    warning:  items.filter(i => i.status === "Warning").length,
+    replaced: items.filter(i => i.status === "Replaced").length,
+    skipped:  items.filter(i => i.status === "Skipped").length,
+  };
+
+  let page = 1;
+  const totalPages = () => doc.internal.getNumberOfPages();
+
+  const addHeaderFooter = () => {
+    // Header — solid navy only, no accent stripe
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, PW, 44, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...WHITE);
+    doc.text("Snowflake to Databricks Migration Report", MARGIN, 28);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(180, 190, 220);
+    doc.text(fmt(now), PW - MARGIN, 28, { align: "right" });
+
+    doc.setFillColor(...BORDER);
+    doc.rect(0, PH - 22, PW, 22, "F");
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text("Generated by Migration Tool", MARGIN, PH - 8);
+    doc.text(`Page ${page} of ${totalPages()}`, PW - MARGIN, PH - 8, { align: "right" });
+  };
+
+  // ── Page 1: summary ───────────────────────────────────────────────────────
+  addHeaderFooter();
+  let y = 60;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...NAVY);
+  doc.text("MIGRATION SUMMARY", MARGIN, y);
+  y += 18;
+
+  const statDefs: [string, number, string][] = [
+    ["Total Items", stats.total,    "#0078d4"],
+    ["Created",     stats.success,  "#10b981"],
+    ["Running",     stats.running,  "#3b82f6"],
+    ["Failed",      stats.failed,   "#ef4444"],
+    ["Warning",     stats.warning,  "#f59e0b"],
+    ["Replaced",    stats.replaced, "#2563eb"],
+    ["Skipped",     stats.skipped,  "#9ca3af"],
+  ];
+
+  const boxW = (PW - MARGIN * 2 - 12) / 7;
+  const boxH = 52;
+
+  statDefs.forEach(([label, val, col], idx) => {
+    const bx = MARGIN + idx * (boxW + 2);
+    const [cr, cg, cb] = hex(col);
+    doc.setFillColor(250, 250, 252);
+    doc.roundedRect(bx, y, boxW, boxH, 4, 4, "F");
+    doc.setFillColor(cr, cg, cb);
+    doc.roundedRect(bx, y, 3, boxH, 1, 1, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(cr, cg, cb);
+    doc.text(String(val), bx + boxW / 2, y + 28, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MUTED);
+    doc.text(label, bx + boxW / 2, y + 42, { align: "center" });
+  });
+
+  y += boxH + 20;
+
+  // Progress bar — neutral gray fill, no blue accent
+  const barW = PW - MARGIN * 2;
+  const progress = stats.total > 0
+    ? (stats.success + stats.failed + stats.replaced + stats.skipped + stats.warning) / stats.total
+    : 0;
+
+  doc.setFillColor(...BORDER);
+  doc.roundedRect(MARGIN, y, barW, 8, 4, 4, "F");
+  if (progress > 0) {
+    doc.setFillColor(...MUTED);
+    doc.roundedRect(MARGIN, y, barW * progress, 8, 4, 4, "F");
+  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    `${stats.success + stats.failed + stats.replaced + stats.skipped + stats.warning} of ${stats.total} items completed (${Math.round(progress * 100)}%)`,
+    MARGIN, y + 20
+  );
+  y += 36;
+
+  // ── Table ─────────────────────────────────────────────────────────────────
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...NAVY);
+  doc.text("ITEMS", MARGIN, y);
+  y += 18;
+
+  const COL = {
+    name:   MARGIN + 10,
+    type:   MARGIN + 200,
+    path:   MARGIN + 300,
+    status: PW - MARGIN - 200,
+    msg:    PW - MARGIN - 120,
+  };
+
+  const ROW_H  = 26;
+  const HEADER_H = 20;
+
+  const drawTableHeader = (yy: number) => {
+    doc.setFillColor(241, 245, 249);
+    doc.rect(MARGIN, yy, PW - MARGIN * 2, HEADER_H, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MUTED);
+    doc.text("ITEM NAME",       COL.name,   yy + 13);
+    doc.text("TYPE",            COL.type,   yy + 13);
+    doc.text("DATABRICKS PATH", COL.path,   yy + 13);
+    doc.text("STATUS",          COL.status, yy + 13);
+    doc.text("MESSAGE",         COL.msg,    yy + 13);
+    return yy + HEADER_H;
+  };
+
+  y = drawTableHeader(y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  let rowIdx = 0;
+
+  const PATH_MAX_WIDTH = COL.status - COL.path - 8;
+
+  for (const item of items) {
+    let pathLines: string[] = ["—"];
+    if (item.databricksNotebook) {
+      doc.setFont("courier", "normal");
+      doc.setFontSize(7);
+      pathLines = doc.splitTextToSize(item.databricksNotebook, PATH_MAX_WIDTH);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+    }
+
+    const dynamicRowH = Math.max(ROW_H, pathLines.length * 10 + 8);
+
+    if (y + dynamicRowH > PH - 40) {
+      page++;
+      doc.addPage();
+      addHeaderFooter();
+      y = 60;
+      y = drawTableHeader(y);
+    }
+
+    if (rowIdx % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(MARGIN, y, PW - MARGIN * 2, dynamicRowH, "F");
+    }
+
+    doc.setDrawColor(...BORDER);
+    doc.setLineWidth(0.5);
+    doc.line(MARGIN, y + dynamicRowH, PW - MARGIN, y + dynamicRowH);
+
+    const mid = y + dynamicRowH / 2 + 3;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...SLATE);
+    const nameStr = item.name.length > 30 ? item.name.slice(0, 28) + "..." : item.name;
+    doc.text(nameStr, COL.name, mid);
+
+    doc.setTextColor(...MUTED);
+    doc.text(TYPE_LABELS[item.type] ?? item.type, COL.type, mid);
+
+    if (item.databricksNotebook) {
+      doc.setFont("courier", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...SLATE);
+      pathLines.forEach((line, li) => {
+        doc.text(line, COL.path, y + 10 + li * 10);
+      });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+    } else {
+      doc.setTextColor(...MUTED);
+      doc.text("—", COL.path, mid);
+    }
+
+    const sc = hex(STATUS_COLORS[item.status]);
+    doc.setFillColor(sc[0], sc[1], sc[2]);
+    doc.setGState(new (doc as any).GState({ opacity: 0.12 }));
+    doc.roundedRect(COL.status - 2, y + (dynamicRowH - 14) / 2, 58, 13, 3, 3, "F");
+    doc.setGState(new (doc as any).GState({ opacity: 1 }));
+    doc.setTextColor(...sc);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.text(
+      STATUS_META[item.status].label,
+      COL.status + 27,
+      y + (dynamicRowH / 2) + 3,
+      { align: "center" }
+    );
+    doc.setFont("helvetica", "normal");
+
+    const msg = item.errorMessage ?? item.warningMessage ?? "";
+    if (msg) {
+      doc.setTextColor(...hex(item.errorMessage ? "#ef4444" : "#d97706"));
+      doc.setFontSize(7.5);
+      const short = msg.length > 34 ? msg.slice(0, 32) + "..." : msg;
+      doc.text(short, COL.msg, mid);
+    } else {
+      doc.setTextColor(...MUTED);
+      doc.text("—", COL.msg, mid);
+    }
+
+    y += dynamicRowH;
+    rowIdx++;
+  }
+
+  const totalPgs = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPgs; p++) {
+    doc.setPage(p);
+    doc.setFillColor(...BORDER);
+    doc.rect(0, PH - 22, PW, 22, "F");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...MUTED);
+    doc.text("Generated by Migration Tool", MARGIN, PH - 8);
+    doc.text(`Page ${p} of ${totalPgs}`, PW - MARGIN, PH - 8, { align: "right" });
+  }
+
+  doc.save(`snowflake-migration-report-${now.toISOString().slice(0, 10)}.pdf`);
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function SnowflakeMigrationReportPreview({ items, allItems, onClose }: Props) {
+  const [downloading, setDownloading] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const now = new Date();
+
+  const stats = {
+    total:    items.length,
+    success:  items.filter(i => i.status === "Success").length,
+    running:  items.filter(i => i.status === "Running").length,
+    failed:   items.filter(i => i.status === "Failed").length,
+    warning:  items.filter(i => i.status === "Warning").length,
+    replaced: items.filter(i => i.status === "Replaced").length,
+    skipped:  items.filter(i => i.status === "Skipped").length,
+  };
+
+  const progress = stats.total > 0
+    ? ((stats.success + stats.failed + stats.replaced + stats.skipped + stats.warning) / stats.total) * 100
+    : 0;
+
+  const handleBackdrop = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await generatePDF(items);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const statRows: { label: string; value: number; color: string; Icon: React.ElementType }[] = [
+    { label: "Total",    value: stats.total,    color: "text-primary",        Icon: FileText },
+    { label: "Created",  value: stats.success,  color: "text-success",        Icon: CheckCircle2 },
+    { label: "Running",  value: stats.running,  color: "text-blue-500",       Icon: Loader2 },
+    { label: "Failed",   value: stats.failed,   color: "text-destructive",    Icon: XCircle },
+    { label: "Warning",  value: stats.warning,  color: "text-yellow-500",     Icon: AlertTriangle },
+    { label: "Replaced", value: stats.replaced, color: "text-blue-600",       Icon: RefreshCw },
+    { label: "Skipped",  value: stats.skipped,  color: "text-muted-foreground", Icon: Minus },
+  ];
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleBackdrop}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    >
+      <div className="bg-background border border-border rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* ── Modal header ─────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+              <FileText className="w-5 h-5 text-foreground" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-foreground text-base leading-tight">
+                Migration Report Preview
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {fmt(now)} · {items.length} item{items.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="azure"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="gap-2"
+            >
+              {downloading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Download className="w-4 h-4" />}
+              {downloading ? "Generating..." : "Download PDF"}
+            </Button>
+            <button
+              onClick={onClose}
+              className="ml-1 p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              aria-label="Close preview"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Scrollable body ───────────────────────────────────────────── */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+
+          {/* Cover card — no gradient top bar */}
+          <div className="rounded-xl overflow-hidden border border-border">
+            <div className="bg-muted/20 px-6 py-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                    Snowflake to Databricks
+                  </p>
+                  <h3 className="text-xl font-bold text-foreground">Migration Report</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">{fmt(now)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Items in report</p>
+                  <p className="text-3xl font-bold text-foreground">{stats.total}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stat pills */}
+          <div className="grid grid-cols-7 gap-2">
+            {statRows.map(({ label, value, color, Icon }) => (
+              <div
+                key={label}
+                className="flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card p-3"
+              >
+                <Icon className={`w-4 h-4 ${color} ${label === "Running" && stats.running > 0 ? "animate-spin" : ""}`} />
+                <span className={`text-xl font-bold ${color}`}>{value}</span>
+                <span className="text-[10px] text-muted-foreground font-medium">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress bar — neutral, no blue */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Overall progress</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-muted-foreground transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Items table */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/40 text-left">
+                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Item</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Databricks Path</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Message</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {items.map((item) => {
+                  const TypeIcon = TYPE_ICONS[item.type] ?? FileText;
+                  const sm = STATUS_META[item.status];
+                  return (
+                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                            <TypeIcon className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                          <span className="font-medium text-foreground truncate max-w-[140px]" title={item.name}>
+                            {item.name}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded bg-muted text-xs text-muted-foreground whitespace-nowrap">
+                          {TYPE_LABELS[item.type]}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 max-w-[200px]">
+                        {item.databricksNotebook ? (
+                          <span
+                            className="font-mono text-xs text-foreground break-all leading-relaxed"
+                            title={item.databricksNotebook}
+                          >
+                            {item.databricksNotebook}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${sm.color}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${sm.dot}`} />
+                          {sm.label}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 max-w-[180px]">
+                        {item.errorMessage ? (
+                          <span className="text-xs text-destructive leading-snug">{item.errorMessage}</span>
+                        ) : item.warningMessage ? (
+                          <span className="text-xs text-yellow-600 dark:text-yellow-400 leading-snug">{item.warningMessage}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── Modal footer ─────────────────────────────────────────────── */}
+        <div className="px-6 py-3 border-t border-border bg-muted/20 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            The downloaded PDF mirrors this preview.
+          </p>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

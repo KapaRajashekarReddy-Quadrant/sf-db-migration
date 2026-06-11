@@ -26,7 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Icon,
-  Cpu,
+  Cpu, ArrowLeft
 } from "lucide-react";
 import {
   Select,
@@ -59,6 +59,7 @@ interface FabricJobsHomeProps {
   onLogout: () => void;
   onMigrateFromSynapse: () => void;
   onMigrateFromDatabricks: () => void;
+  onBackToHub: () => void;
   userName?: string;
 }
 
@@ -66,6 +67,7 @@ export function FabricJobsHome({
   onLogout,
   onMigrateFromSynapse,
   onMigrateFromDatabricks,
+  onBackToHub,
   userName = "User",
 }: FabricJobsHomeProps) {
   const [showFabricModal, setShowFabricModal] = useState(false);
@@ -75,12 +77,12 @@ export function FabricJobsHome({
   const [workspaces, setWorkspaces] = useState<FabricWorkspace[]>([]);
   const [apiResponse, setApiResponse] = useState<FabricApiResponse | null>(null); // Store original API response
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("all");
-  
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -90,7 +92,7 @@ export function FabricJobsHome({
   // Transform API response to job format
   const transformApiResponseToJobs = (apiData: FabricApiResponse): FabricJob[] => {
     const transformedJobs: FabricJob[] = [];
-    
+
     apiData.workspaces.forEach((workspace) => {
       workspace.notebooks.forEach((notebook) => {
         transformedJobs.push({
@@ -249,8 +251,8 @@ export function FabricJobsHome({
         return Database;
       case 'semantic model':
         return Database;
-      case 'spark pool':  
-        return Cpu;  
+      case 'spark pool':
+        return Cpu;
       default:
         return FolderOpen;
     }
@@ -259,10 +261,10 @@ export function FabricJobsHome({
   const filteredJobs = useMemo(() => {
     return workspaceFilteredJobs.filter(job => {
       const matchesSearch = job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           job.type.toLowerCase().includes(searchQuery.toLowerCase());
+        job.type.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || job.status === statusFilter;
       const matchesType = typeFilter === "all" || job.type === typeFilter;
-      
+
       return matchesSearch && matchesStatus && matchesType;
     });
   }, [workspaceFilteredJobs, searchQuery, statusFilter, typeFilter]);
@@ -278,16 +280,16 @@ export function FabricJobsHome({
     setCurrentPage(1);
   }, [searchQuery, statusFilter, typeFilter, selectedWorkspace]);
 
-useEffect(() => {
-  // Auto-load Fabric data if we already have it from migration workflow
-  if (fabricApiResponse && fabricCredentials && !isFabricConnected) {
-    setIsFabricConnected(true);
-    setApiResponse(fabricApiResponse);
-    setWorkspaces(fabricApiResponse.workspaces);
-    const transformedJobs = transformApiResponseToJobs(fabricApiResponse);
-    setJobs(transformedJobs);
-  }
-}, [fabricApiResponse, fabricCredentials, isFabricConnected]);
+  useEffect(() => {
+    // Auto-load Fabric data if we already have it from migration workflow
+    if (fabricApiResponse && fabricCredentials && !isFabricConnected) {
+      setIsFabricConnected(true);
+      setApiResponse(fabricApiResponse);
+      setWorkspaces(fabricApiResponse.workspaces);
+      const transformedJobs = transformApiResponseToJobs(fabricApiResponse);
+      setJobs(transformedJobs);
+    }
+  }, [fabricApiResponse, fabricCredentials, isFabricConnected]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -303,6 +305,13 @@ useEffect(() => {
       <main className={`flex-1 px-6 py-4 max-w-7xl mx-auto w-full flex flex-col ${!isFabricConnected ? 'overflow-hidden' : ''}`}>
         {/* Page Header */}
         <div className="mb-3 flex-shrink-0">
+          <button
+            onClick={onBackToHub}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to hub
+          </button>
           <h1 className="text-2xl font-bold text-foreground mb-1">
             Fabric Migration Hub
           </h1>
@@ -355,7 +364,7 @@ useEffect(() => {
 
         {/* Fabric Jobs - Takes remaining space */}
         <Card className={`${isFabricConnected ? 'mb-4' : 'flex-1'} flex flex-col ${!isFabricConnected ? 'overflow-hidden min-h-0' : ''}`}>
-          <CardHeader className="pb-3 flex-shrink-0"> 
+          <CardHeader className="pb-3 flex-shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <CardTitle className="text-sm">Fabric Jobs</CardTitle>
@@ -386,7 +395,7 @@ useEffect(() => {
             {isFabricConnected && Object.keys(typeCounts).length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                 {/* All Items Card */}
-                <Card 
+                <Card
                   className="cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => setTypeFilter("all")}
                 >
@@ -396,12 +405,10 @@ useEffect(() => {
                         <p className="text-2xl font-bold">{workspaceFilteredJobs.length}</p>
                         <p className="text-xs text-muted-foreground mt-1">All</p>
                       </div>
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        typeFilter === "all" ? 'bg-primary/20' : 'bg-muted'
-                      }`}>
-                        <FolderOpen className={`w-5 h-5 ${
-                          typeFilter === "all" ? 'text-primary' : 'text-muted-foreground'
-                        }`} />
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeFilter === "all" ? 'bg-primary/20' : 'bg-muted'
+                        }`}>
+                        <FolderOpen className={`w-5 h-5 ${typeFilter === "all" ? 'text-primary' : 'text-muted-foreground'
+                          }`} />
                       </div>
                     </div>
                   </CardContent>
@@ -411,8 +418,8 @@ useEffect(() => {
                 {Object.entries(typeCounts).map(([type, count]) => {
                   const Icon = getTypeIcon(type);
                   return (
-                    <Card 
-                      key={type} 
+                    <Card
+                      key={type}
                       className="cursor-pointer hover:bg-accent/50 transition-colors"
                       onClick={() => setTypeFilter(typeFilter === type ? "all" : type)}
                     >
@@ -422,12 +429,10 @@ useEffect(() => {
                             <p className="text-2xl font-bold">{count}</p>
                             <p className="text-xs text-muted-foreground mt-1 truncate">{type}</p>
                           </div>
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            typeFilter === type ? 'bg-primary/20' : 'bg-muted'
-                          }`}>
-                            <Icon className={`w-5 h-5 ${
-                              typeFilter === type ? 'text-primary' : 'text-muted-foreground'
-                            }`} />
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeFilter === type ? 'bg-primary/20' : 'bg-muted'
+                            }`}>
+                            <Icon className={`w-5 h-5 ${typeFilter === type ? 'text-primary' : 'text-muted-foreground'
+                              }`} />
                           </div>
                         </div>
                       </CardContent>
@@ -567,13 +572,13 @@ useEffect(() => {
                           </TableCell>
 
                           <TableCell className="text-right">
-                            <Button 
+                            <Button
                               size="sm"
                               variant="outline"
                               onClick={() => {
                                 const originalData = getOriginalItemData(job);
-                                setSelectedItem({ 
-                                  type: job.type, 
+                                setSelectedItem({
+                                  type: job.type,
                                   data: {
                                     ...originalData,
                                     workspace: job.workspace,
@@ -597,7 +602,7 @@ useEffect(() => {
                 <div className="text-xs text-muted-foreground">
                   Showing {startIndex + 1}-{Math.min(endIndex, filteredJobs.length)} of {filteredJobs.length} jobs
                 </div>
-                
+
                 {totalPages > 1 && (
                   <div className="flex items-center gap-2">
                     <Button
@@ -608,11 +613,11 @@ useEffect(() => {
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    
+
                     <div className="text-xs text-muted-foreground">
                       Page {currentPage} of {totalPages}
                     </div>
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -630,15 +635,15 @@ useEffect(() => {
       </main>
 
       <ConnectFabricModal
-  open={showFabricModal}
-  onClose={() => setShowFabricModal(false)}
-  onConnect={handleConnectFabric}
-/>
+        open={showFabricModal}
+        onClose={() => setShowFabricModal(false)}
+        onConnect={handleConnectFabric}
+      />
 
       {selectedItem && (
-        <DetailModal 
-          item={selectedItem} 
-          onClose={() => setSelectedItem(null)} 
+        <DetailModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
         />
       )}
 

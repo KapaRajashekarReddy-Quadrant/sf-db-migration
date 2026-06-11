@@ -231,7 +231,7 @@
 
 
 
-export type Status = "Success" | "Running" | "Failed" | "Paused" | "Skipped" | "Replaced" | "Ready";
+export type Status = "Success" | "Running" | "Failed" | "Paused" | "Skipped" | "Replaced" | "Ready"| "Warning";
  
 export interface FabricJob {
   id: string;
