@@ -97,7 +97,7 @@ export function ConnectSnowflakeModal({ open, onClose, onConnect }: ConnectSnowf
     };
 
     try {
-      const response = await fetch("http://20.106.196.248:8001/api/discover-snowflake", {
+      const response = await fetch("https://20.106.196.248:8443/api/discover-snowflake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestPayload),
