@@ -59,7 +59,7 @@ interface ConnectDatabricksModalProps {
   ) => void;
 }
 
-const DISCOVERY_ENDPOINT = "http://20.106.196.248:8001/api/discover-databricks";
+const DISCOVERY_ENDPOINT = "https://20.106.196.248:8443/api/discover-databricks";
 
 export function ConnectDatabricksModal({
   open,
