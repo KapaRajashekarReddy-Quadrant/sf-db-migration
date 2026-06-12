@@ -240,7 +240,7 @@ async function migrateDataApi(entities: DataMigrationEntity[], credentials: any)
         credentials: { ...credPay, token: "***", password: "***" },
     });
 
-    const response = await fetch("https://20.106.196.248:8443/api/migrate-data", {
+    const response = await fetch("https://snowflaketodatabricks-h2bgh2hch9h7f6fb.z01.azurefd.net/api/migrate-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -270,7 +270,7 @@ async function migrateNotebooksApi(notebooks: SnowflakeNotebook[], credentials: 
 
     console.log("[migrateNotebooksApi] payload:", { ...payload, credentials: { ...payload.credentials, token: "***", password: "***" } });
 
-    const r = await fetch("https://20.106.196.248:8443/api/migrate-notebooks", {
+    const r = await fetch("https://snowflaketodatabricks-h2bgh2hch9h7f6fb.z01.azurefd.net/api/migrate-notebooks", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(`Notebooks API error: ${r.status}`);
@@ -295,7 +295,7 @@ async function migrateWorksheetsApi(worksheets: SnowflakeSQLWorksheet[], targetC
 
     console.log("[migrateWorksheetsApi] payload:", payload);
 
-    const r = await fetch("https://20.106.196.248:8443/api/migrate-worksheets", {
+    const r = await fetch("https://snowflaketodatabricks-h2bgh2hch9h7f6fb.z01.azurefd.net/api/migrate-worksheets", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(`Worksheets API error: ${r.status}`);
@@ -323,7 +323,7 @@ async function migrateTasksApi(tasks: SnowflakeTask[], credentials: any, targetC
 
     console.log("[migrateTasksApi] payload:", payload);
 
-    const r = await fetch("https://20.106.196.248:8443/api/migrate-tasks", {
+    const r = await fetch("https://snowflaketodatabricks-h2bgh2hch9h7f6fb.z01.azurefd.net/api/migrate-tasks", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(`Tasks API error: ${r.status}`);
@@ -351,7 +351,7 @@ async function migrateStoredProcsApi(procs: SnowflakeStoredProc[], credentials: 
 
     console.log("[migrateStoredProcsApi] payload:", payload);
 
-    const r = await fetch("https://20.106.196.248:8443/api/migrate-procedures", {
+    const r = await fetch("https://snowflaketodatabricks-h2bgh2hch9h7f6fb.z01.azurefd.net/api/migrate-procedures", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     if (!r.ok) throw new Error(`Procedures API error: ${r.status}`);
