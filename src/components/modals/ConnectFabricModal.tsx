@@ -214,7 +214,7 @@ export function ConnectFabricModal({
   const [formData, setFormData] = useState({
     tenantId: "0eadb77e-42dc-47f8-bbe3-ec2395e0712c",
     clientId: "1dd09e8f-5f60-429e-8386-5ace4693440b",
-    clientSecret: "y1~8Q~Ve_Dop-gXOuoMkaHyT.Jc5MC1RSERM4boN",
+    clientSecret: "oUT8Q~Rvm3VyQgSZCaou3CE1AZ5I5DKVk4tYJcsj",
     subscriptionId: "",
   });
   const { toast } = useToast();

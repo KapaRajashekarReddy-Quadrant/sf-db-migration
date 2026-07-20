@@ -1673,9 +1673,9 @@ export function MigrationWorkspace({
   // =========================================================
   if (showReview) {
     const selectedDetails = getSelectedItemDetails();
-    function setShowDataMigration(arg0: boolean): void {
-      throw new Error("Function not implemented.");
-    }
+    // function setShowDataMigration(arg0: boolean): void {
+    //   throw new Error("Function not implemented.");
+    // }
 
     return (
       <div className="min-h-screen bg-background">
@@ -1750,13 +1750,13 @@ export function MigrationWorkspace({
                 <Button variant="outline" onClick={() => setShowReview(false)}>Back to Selection</Button>
                  <div className="flex gap-3">
                 {/* New Data Migration Button */}
-                <Button
+                {/*<Button
                   variant="azure"
                   onClick={() => setShowDataMigration(true)} // adjust handler as needed
                   disabled={isMigrating}
                 >
                   Data Migration
-                </Button>
+                </Button> */}
     </div>
                 <Button variant="azure" onClick={() => setShowTargetModal(true)} disabled={totalSelected === 0 || isMigrating}>
                   {isMigrating ? <><Loader2 className="w-4 h-4 animate-spin" /> Migrating...</> : <>Migrate <ArrowRight className="w-4 h-4" /></>}

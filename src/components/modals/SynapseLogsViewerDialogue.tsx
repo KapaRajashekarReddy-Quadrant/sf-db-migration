@@ -11,27 +11,27 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, AlertCircle, FileText, RefreshCw, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
- 
+
 interface LogEntry {
     timestamp: string;
     message: string;
     severity: number;
     type?: string;
 }
- 
+
 interface LogsResponse {
     run_id: string;
     log_count: number;
     logs: LogEntry[];
 }
- 
+
 interface LogsViewerDialogProps {
     open: boolean;
     onClose: () => void;
     jobName: string;
     runId: string;
 }
- 
+
 export function LogsViewerDialog({
     open,
     onClose,
@@ -43,18 +43,18 @@ export function LogsViewerDialog({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
- 
+
     const fetchLogs = async () => {
         setIsLoading(true);
         setError(null);
- 
+
         try {
             console.log(`🔍 Fetching logs for runId: ${runId}`);
- 
+
             const url = `https://20.106.196.248/Getlogs`;
- 
+
             console.log("📡 Fetching from URL:", url);
- 
+
             const response = await fetch(url, {
                 method: "POST",
                 headers: {
@@ -63,34 +63,40 @@ export function LogsViewerDialog({
                 body: JSON.stringify({ run_id: runId }),
             });
             console.log("📥 Response status:", response.status);
- 
+
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error("❌ API Error Response:", errorText);
                 throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
             }
- 
+
             const data: LogsResponse | LogEntry[] = await response.json();
             console.log("📊 Logs data received:", data);
- 
+
             // Handle new nested format: { run_id, log_count, logs: [...] }
             // OR legacy flat array format: [...]
-            let logsArray: LogEntry[];
- 
-            if (Array.isArray(data)) {
+            let logsArray: LogEntry[] = [];
+
+            if (data && typeof data === 'object' && 'results' in data && Array.isArray((data as any).results)) {
+                // New format: { results: [{ run_id, log_count, logs }], total_runs }
+                const firstResult = (data as any).results[0];
+                if (firstResult && Array.isArray(firstResult.logs)) {
+                    logsArray = firstResult.logs;
+                    console.log(`📦 Using results-wrapper format (log_count: ${firstResult.log_count})`);
+                }
+            } else if (data && typeof data === 'object' && 'logs' in data && Array.isArray((data as any).logs)) {
+                logsArray = (data as any).logs;
+                console.log(`📦 Using legacy nested format (log_count: ${(data as any).log_count})`);
+            } else if (Array.isArray(data)) {
                 logsArray = data;
                 console.log("📦 Using legacy array format");
-            } else if (data && typeof data === 'object' && 'logs' in data) {
-                logsArray = data.logs;
-                console.log(`📦 Using new nested format (log_count: ${data.log_count})`);
             } else {
-                throw new Error("Invalid response format: expected logs array or response object");
+                throw new Error("Invalid response format: expected results array, logs object, or flat array");
             }
- 
             if (!Array.isArray(logsArray)) {
                 throw new Error("Invalid response format: logs must be an array");
             }
- 
+
             if (logsArray.length === 0) {
                 setError("empty");
                 setLogs([]);
@@ -105,7 +111,7 @@ export function LogsViewerDialog({
             const errorMsg = err instanceof Error ? err.message : "Failed to fetch logs";
             setError(errorMsg);
             setLogs([]);
- 
+
             toast({
                 title: "Error Fetching Logs",
                 description: errorMsg,
@@ -115,7 +121,7 @@ export function LogsViewerDialog({
             setIsLoading(false);
         }
     };
- 
+
     useEffect(() => {
         if (open && runId) {
             console.log("🚀 Dialog opened, fetching logs for:", runId);
@@ -124,7 +130,7 @@ export function LogsViewerDialog({
             console.error("❌ Dialog opened but no runId provided");
             setError("No run ID available for this item");
         }
- 
+
         return () => {
             if (!open) {
                 setLogs([]);
@@ -133,7 +139,7 @@ export function LogsViewerDialog({
             }
         };
     }, [open, runId]);
- 
+
     const getSeverityColor = (severity: number) => {
         switch (severity) {
             case 1: return "text-blue-600 dark:text-blue-400";
@@ -142,7 +148,7 @@ export function LogsViewerDialog({
             default: return "text-muted-foreground";
         }
     };
- 
+
     const getSeverityBgColor = (severity: number) => {
         switch (severity) {
             case 1: return "bg-blue-500/10";
@@ -151,7 +157,7 @@ export function LogsViewerDialog({
             default: return "bg-muted/30";
         }
     };
- 
+
     const getSeverityLabel = (severity: number) => {
         switch (severity) {
             case 1: return "INFO";
@@ -160,7 +166,7 @@ export function LogsViewerDialog({
             default: return "LOG";
         }
     };
- 
+
     const formatTimestamp = (timestamp: string) => {
         try {
             const date = new Date(timestamp);
@@ -176,16 +182,16 @@ export function LogsViewerDialog({
             return timestamp;
         }
     };
- 
+
     const getLogStats = () => ({
         total: logs.length,
         info: logs.filter(l => l.severity === 1).length,
         warnings: logs.filter(l => l.severity === 2).length,
         errors: logs.filter(l => l.severity === 3).length,
     });
- 
+
     const stats = getLogStats();
- 
+
     return (
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="max-w-6xl h-[95vh] flex flex-col p-0">
@@ -204,7 +210,7 @@ export function LogsViewerDialog({
                                 </DialogDescription>
                             </div>
                         </div>
- 
+
                         {/* Compact Stats */}
                         {!isLoading && logs.length > 0 && (
                             <div className="flex items-center gap-2 shrink-0 mr-2">
@@ -234,9 +240,9 @@ export function LogsViewerDialog({
                         )}
                     </div>
                 </DialogHeader>
- 
+
                 <div className="flex-1 overflow-y-hidden overflow-x-hidden px-4 flex flex-col min-w-0">
- 
+
                     {/* Loading State */}
                     {isLoading && (
                         <div className="flex-1 flex flex-col items-center justify-center">
@@ -244,7 +250,7 @@ export function LogsViewerDialog({
                             <p className="text-sm text-muted-foreground">Loading migration logs...</p>
                         </div>
                     )}
- 
+
                     {/* Empty State */}
                     {!isLoading && error === "empty" && (
                         <div className="flex-1 flex flex-col items-center justify-center">
@@ -270,7 +276,7 @@ export function LogsViewerDialog({
                             </div>
                         </div>
                     )}
- 
+
                     {/* Error State */}
                     {!isLoading && error && error !== "empty" && (
                         <div className="flex-1 flex flex-col items-center justify-center">
@@ -295,7 +301,7 @@ export function LogsViewerDialog({
                             </div>
                         </div>
                     )}
- 
+
                     {/* Logs List */}
                     {!isLoading && logs.length > 0 && (
                         <div className="flex-1 flex flex-col overflow-hidden mt-3 min-w-0">
@@ -317,7 +323,7 @@ export function LogsViewerDialog({
                                     Refresh
                                 </Button>
                             </div>
- 
+
                             <ScrollArea className="flex-1 rounded-lg border bg-muted/20 min-w-0">
                                 <div className="p-3 space-y-1.5 min-w-0">
                                     {logs.map((log, index) => (
@@ -351,7 +357,7 @@ export function LogsViewerDialog({
                         </div>
                     )}
                 </div>
- 
+
                 {/* Footer */}
                 <div className="px-4 py-2.5 border-t shrink-0">
                     <div className="flex justify-end">
@@ -364,4 +370,3 @@ export function LogsViewerDialog({
         </Dialog>
     );
 }
- 
