@@ -323,10 +323,10 @@ export function ConnectSynapseModal({ open, onClose, onConnect }: ConnectSynapse
   const [loading, setLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [formData, setFormData] = useState<SynapseConnection>({
-    tenantId: "0eadb77e-42dc-47f8-bbe3-ec2395e0712c",
-    clientId: "1dd09e8f-5f60-429e-8386-5ace4693440b",
-    clientSecret: "oUT8Q~Rvm3VyQgSZCaou3CE1AZ5I5DKVk4tYJcsj",
-    workspaceName: "synapsetofabricws1",
+    tenantId: "",
+    clientId: "",
+    clientSecret: "",
+    workspaceName: "",
     discoveryScope: {
       sparkPools: true,
       notebooks: true,
