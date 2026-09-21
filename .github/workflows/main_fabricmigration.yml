@@ -54,4 +54,4 @@ jobs:
           app-name: 'fabricmigration'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_BBCB46BC62FA46F8AF8524F64D6C6EB5 }}
+          publish-profile: ${{ secrets.FABRICMIGRATION_PUBLISH_PROFILE }}
