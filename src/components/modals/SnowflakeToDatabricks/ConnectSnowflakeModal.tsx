@@ -175,26 +175,26 @@ export function ConnectSnowflakeModal({ open, onClose, onConnect }: ConnectSnowf
 
             <div className="space-y-1.5">
               <Label>Account <span className="text-destructive">*</span></Label>
-              <Input placeholder="e.g. QPXJSGB-RY62199" value={credentials.account}
+              <Input placeholder="" value={credentials.account}
                 onChange={(e) => setField("account", e.target.value)} disabled={loading} />
               <p className="text-xs text-muted-foreground">Your Snowflake account identifier</p>
             </div>
 
             <div className="space-y-1.5">
               <Label>Username <span className="text-destructive">*</span></Label>
-              <Input placeholder="e.g. navaneethhk" value={credentials.user}
+              <Input placeholder="" value={credentials.user}
                 onChange={(e) => setField("user", e.target.value)} disabled={loading} />
             </div>
 
             <div className="space-y-1.5">
               <Label>Password <span className="text-destructive">*</span></Label>
-              <Input type="password" placeholder="••••••••" value={credentials.password}
+              <Input type="password" placeholder="" value={credentials.password}
                 onChange={(e) => setField("password", e.target.value)} disabled={loading} />
             </div>
 
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Input placeholder="ACCOUNTADMIN" value={credentials.role}
+              <Input placeholder="" value={credentials.role}
                 onChange={(e) => setField("role", e.target.value)} disabled={loading} />
               <p className="text-xs text-muted-foreground">Defaults to ACCOUNTADMIN if left blank</p>
             </div>
