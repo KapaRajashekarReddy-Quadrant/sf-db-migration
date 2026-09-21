@@ -156,7 +156,7 @@ export function ConnectDatabricksModal({
               Workspace URL <span className="text-destructive">*</span>
             </Label>
             <Input
-              placeholder="https://adb-123456.azuredatabricks.net"
+              placeholder=""
               value={formData.workspaceUrl}
               onChange={(e) => {
                 setFormData({ ...formData, workspaceUrl: e.target.value });
