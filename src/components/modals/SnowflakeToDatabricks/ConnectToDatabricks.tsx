@@ -72,8 +72,8 @@ export function ConnectDatabricksModal({
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<DatabricksMigrationConfig>({
-    workspaceUrl: "https://adb-7405608725974682.2.azuredatabricks.net",
-    accessToken: "dapi8c0bd9be0ae7a1b87d2e965c6c68b656-3",
+    workspaceUrl: "",
+    accessToken: "",
   });
 
   const handleConnect = async () => {
