@@ -49,7 +49,7 @@ export function ConnectSnowflakeModal({ open, onClose, onConnect }: ConnectSnowf
     account:  "",
     user:     "",
     password: "",
-    role:     "",
+    role:     "", 
     token:    "",
   });
 
