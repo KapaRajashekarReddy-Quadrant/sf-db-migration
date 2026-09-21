@@ -46,11 +46,11 @@ export function ConnectSnowflakeModal({ open, onClose, onConnect }: ConnectSnowf
   const [error, setError] = useState<string | null>(null);
 
   const [credentials, setCredentialFields] = useState({
-    account:  "QPXJSGB-RY62199",
-    user:     "navaneethhk",
-    password: "Qu@Dr@nt-2o25#",
-    role:     "ACCOUNTADMIN",
-    token:    "eyJraWQiOiIyODIyNDIwNTc5NTI4NzEwIiwiYWxnIjoiRVMyNTYifQ.eyJwIjoiMTY4MjI5MzgwOjQzMDY2NzI4NDUzIiwiaXNzIjoiU0Y6MTAyMyIsImV4cCI6MTc4ODg3MDM3Mn0._vFuCDvbd6E-umzRBN4dX5amTNmluoQ8c-9_alN0K3EIyYrkOoeqAaOyzAA1GPLrSbewVeCYa0wZSpajjd97Sg",
+    account:  "",
+    user:     "",
+    password: "",
+    role:     "",
+    token:    "",
   });
 
   const [includes, setIncludes] = useState({
